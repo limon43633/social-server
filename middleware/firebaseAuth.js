@@ -10,12 +10,13 @@ export const verifyFirebaseToken = async (req, res, next) => {
         });
       }
   
-      // For development - accept any token
-      // In production, replace this with real Firebase Admin verification
+      // For development - accept any token and create mock user
+      // In production, replace with: await admin.auth().verifyIdToken(token);
       req.user = {
         email: 'test@example.com',
-        uid: 'test-uid',
-        name: 'Test User'
+        uid: 'test-uid-123',
+        name: 'Test User',
+        picture: ''
       };
       
       next();
