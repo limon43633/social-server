@@ -42,6 +42,56 @@ router.get('/upcoming', async (req, res) => {
   }
 });
 
+// Get user's created events (protected) - MOVED BEFORE /:id
+router.get('/user/created', verifyFirebaseToken, async (req, res) => {
+  try {
+    const db = getDatabase();
+    const eventsCollection = db.collection('events');
+    
+    const events = await eventsCollection
+      .find({ creatorEmail: req.user.email })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.json({
+      success: true,
+      data: events
+    });
+  } catch (error) {
+    console.error('Get user events error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error fetching your events' 
+    });
+  }
+});
+
+// Get user's joined events (protected) - MOVED BEFORE /:id
+router.get('/user/joined', verifyFirebaseToken, async (req, res) => {
+  try {
+    const db = getDatabase();
+    const eventsCollection = db.collection('events');
+    
+    const events = await eventsCollection
+      .find({ 
+        'participants.userEmail': req.user.email 
+      })
+      .sort({ eventDate: 1 })
+      .toArray();
+
+    res.json({
+      success: true,
+      data: events
+    });
+  } catch (error) {
+    console.error('Get joined events error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error fetching joined events' 
+    });
+  }
+});
+
 // Get single event by ID
 router.get('/:id', async (req, res) => {
   try {
@@ -201,56 +251,6 @@ router.post('/:id/join', verifyFirebaseToken, async (req, res) => {
   }
 });
 
-// Get user's created events (protected)
-router.get('/user/created', verifyFirebaseToken, async (req, res) => {
-  try {
-    const db = getDatabase();
-    const eventsCollection = db.collection('events');
-    
-    const events = await eventsCollection
-      .find({ creatorEmail: req.user.email })
-      .sort({ createdAt: -1 })
-      .toArray();
-
-    res.json({
-      success: true,
-      data: events
-    });
-  } catch (error) {
-    console.error('Get user events error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error fetching your events' 
-    });
-  }
-});
-
-// Get user's joined events (protected)
-router.get('/user/joined', verifyFirebaseToken, async (req, res) => {
-  try {
-    const db = getDatabase();
-    const eventsCollection = db.collection('events');
-    
-    const events = await eventsCollection
-      .find({ 
-        'participants.userEmail': req.user.email 
-      })
-      .sort({ eventDate: 1 })
-      .toArray();
-
-    res.json({
-      success: true,
-      data: events
-    });
-  } catch (error) {
-    console.error('Get joined events error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error fetching joined events' 
-    });
-  }
-});
-
 // Update event (protected - creator only)
 router.put('/:id', verifyFirebaseToken, async (req, res) => {
   try {
@@ -306,6 +306,57 @@ router.put('/:id', verifyFirebaseToken, async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: 'Server error updating event' 
+    });
+  }
+});
+
+// Delete event (protected - creator only) - NEW ROUTE
+router.delete('/:id', verifyFirebaseToken, async (req, res) => {
+  try {
+    const db = getDatabase();
+    const eventsCollection = db.collection('events');
+    
+    const eventId = req.params.id;
+
+    // Check if event exists and user is creator
+    const event = await eventsCollection.findOne({ 
+      _id: new ObjectId(eventId) 
+    });
+
+    if (!event) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Event not found' 
+      });
+    }
+
+    if (event.creatorEmail !== req.user.email) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'You can only delete your own events' 
+      });
+    }
+
+    const result = await eventsCollection.deleteOne({ 
+      _id: new ObjectId(eventId) 
+    });
+
+    if (result.deletedCount === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Failed to delete event' 
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Event deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete event error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error deleting event' 
     });
   }
 });

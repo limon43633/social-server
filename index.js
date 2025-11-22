@@ -9,57 +9,73 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// FIXED CORS - Add your deployed URLs
+// ✅ CORS Configuration - এটা সবার আগে
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173', 
   'http://localhost:5174',
-  'https://social-client-cb1t.onrender.com',  // ✅ Add this
-  'https://social-server-2s6h.onrender.com'   // ✅ Add this
+  'https://social-client-cb1t.onrender.com',
+  'https://social-server-2s6h.onrender.com'
 ];
 
+// CORS middleware - MUST BE FIRST
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (Postman, mobile apps, etc.)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('❌ Blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
     }
-    return callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range']
 }));
 
 // Handle preflight requests
 app.options('*', cors());
 
+// Body parser middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Logging middleware (optional but helpful)
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`);
+  next();
+});
 
 // Routes
 app.use('/api/events', eventRoutes);
-
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ 
-    success: true, 
-    message: 'Server is running!',
-    timestamp: new Date().toISOString()
-  });
-});
 
 // Root route
 app.get('/', (req, res) => {
   res.json({ 
     success: true, 
-    message: 'Social Events API',
+    message: 'Social Events API is running',
+    version: '1.0.0',
     endpoints: {
       health: '/health',
-      events: '/api/events/upcoming'
+      events: '/api/events/upcoming',
+      createEvent: 'POST /api/events',
+      userEvents: '/api/events/user/created',
+      joinedEvents: '/api/events/user/joined'
     }
+  });
+});
+
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ 
+    success: true, 
+    message: 'Server is healthy!',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
   });
 });
 
@@ -67,7 +83,8 @@ app.get('/', (req, res) => {
 app.use('*', (req, res) => {
   res.status(404).json({ 
     success: false, 
-    message: 'Route not found' 
+    message: 'Route not found',
+    path: req.originalUrl
   });
 });
 
@@ -76,7 +93,7 @@ app.use((error, req, res, next) => {
   console.error('Server error:', error);
   res.status(500).json({ 
     success: false, 
-    message: 'Internal server error' 
+    message: error.message || 'Internal server error' 
   });
 });
 
@@ -84,11 +101,18 @@ app.use((error, req, res, next) => {
 const startServer = async () => {
   try {
     await connectToDatabase();
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`📍 Health check: http://localhost:${PORT}/health`);
-      console.log(`📍 Events API: http://localhost:${PORT}/api/events/upcoming`);
-      console.log(`🌐 CORS enabled for:`, allowedOrigins);
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`
+╔════════════════════════════════════════════╗
+║   🚀 Social Events API Server Started     ║
+╠════════════════════════════════════════════╣
+║   📍 Port: ${PORT}                         ║
+║   📍 Health: http://localhost:${PORT}/health
+║   📍 API: http://localhost:${PORT}/api/events
+║   🌐 CORS Enabled for:                     ║
+${allowedOrigins.map(origin => `║      - ${origin}`).join('\n')}
+╚════════════════════════════════════════════╝
+      `);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
