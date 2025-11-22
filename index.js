@@ -9,11 +9,14 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
+// Middleware - FIXED CORS CONFIGURATION
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
-  credentials: true
+  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'https://your-frontend-app.vercel.app'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
 app.use(express.json());
 
 // Routes
@@ -53,7 +56,7 @@ const startServer = async () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📍 Health check: http://localhost:${PORT}/health`);
       console.log(`📍 Events API: http://localhost:${PORT}/api/events/upcoming`);
-      console.log(`📍 MongoDB: ${process.env.MONGODB_URI ? 'Connected' : 'Not configured'}`);
+      console.log(`📍 CORS enabled for: localhost:3000, localhost:5173, localhost:5174`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
